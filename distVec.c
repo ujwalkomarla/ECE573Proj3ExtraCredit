@@ -13,6 +13,8 @@ int noOfNeighbours;
 struct neighbourDB *neighbourInfo;
 unsigned int SockID;
 pthread_mutex_t sendMutex;
+float *myNextHopMatrix; 
+
 
 //Argument 0: Program name, Argument 1: Self Server Port Number. Argument 2: Self NodeNumbInTopology. Argument 3: Total Number of nodes in topology. 
 //One Set(IP PortNo Cost NodeNumbInTopology)
@@ -37,10 +39,11 @@ void catch_alarm (int sig)
   //printf("Alarm event\n");
   struct sockaddr_in sendTo;
   pthread_mutex_lock(&sendMutex);
+  int i;
 	for(i=0;i<noOfNeighbours;i++){
 		sendTo.sin_family = AF_INET;
 		sendTo.sin_port = htons(neighbourInfo->ServerPortNos[i]);
-		sendTo.sin_addr.s_addr = inet_addr(neighbourInfo->IPaddr[i]);
+		sendTo.sin_addr.s_addr = neighbourInfo->IPaddr[i];
 		sendto(SockID,myCostMatrix,sizeof(float) *  (noOfNodesInTopology),0,(struct sockaddr *)&sendTo,sizeof(sendTo));
 	}
 	pthread_mutex_unlock(&sendMutex);
@@ -52,8 +55,10 @@ void* DV_ALGO(void *msg){
 	struct sockaddr_in tRecvdFrom;
 	unsigned int sizeRecvdFrom = sizeof(tRecvdFrom);
 	unsigned int SEND=0;
+	int i,j;
+	float costToi;
 	while(1){
-		if((sizeof(myCostMatrix) != recvfrom(sockID,buf,MAX_SIZE,0,(struct sockaddr *)&tRecvdFrom,&sizeRecvdFrom))<0) DieWithError("Server can't receive packets");
+		if((sizeof(myCostMatrix) != recvfrom(SockID,buf,MAX_SIZE,0,(struct sockaddr *)&tRecvdFrom,&sizeRecvdFrom))<0) DieWithError("Server can't receive packets");
 		for(i=0;i<noOfNeighbours;i++){
 			if(tRecvdFrom.sin_port == neighbourInfo->ServerPortNos[i] && tRecvdFrom.sin_addr.s_addr == neighbourInfo->IPaddr[i]){
 				costToi = myCostMatrix[i];
@@ -76,7 +81,7 @@ void* DV_ALGO(void *msg){
 			for(i=0;i<noOfNeighbours;i++){
 				sendTo.sin_family = AF_INET;
 				sendTo.sin_port = htons(neighbourInfo->ServerPortNos[i]);
-				sendTo.sin_addr.s_addr = inet_addr(neighbourInfo->IPaddr[i]);
+				sendTo.sin_addr.s_addr = neighbourInfo->IPaddr[i];
 				sendto(SockID,myCostMatrix,sizeof(float) *  (noOfNodesInTopology),0,(struct sockaddr *)&sendTo,sizeof(sendTo));
 			}
 			SEND=0;
@@ -95,12 +100,13 @@ int main(int argc, char **argv){
 	int i;
 	int myServerPort;
 	int selfNodeNumbInTopology;
+	//float costToi;
 	pthread_mutex_init(&sendMutex,NULL);
 	myServerPort = atoi(argv[1]);
 	selfNodeNumbInTopology = atoi(argv[2]);
 	noOfNodesInTopology = atoi(argv[3]);
 	noOfNeighbours = (argc - (NEIGHBOUR_SET_START+1))/NEIGHBOUR_SET_INFO; //Argument 0: Program name, Argument 1: Self Server Port Number. Argument 2: Total Number of nodes in topology. One Set(IP PortNo Cost)
-	pthread_t thread_DV_ALGO, thread_timer;
+	pthread_t thread_DV_ALGO;//, thread_timer;
 	//int myIP;
 	neighbourInfo = malloc(sizeof(struct neighbourDB));
 	neighbourInfo->IPaddr = malloc(sizeof(int) * noOfNeighbours);
@@ -112,8 +118,8 @@ int main(int argc, char **argv){
 	
 	myCostMatrix[selfNodeNumbInTopology] = 0.0;
 	myNextHopMatrix[selfNodeNumbInTopology] = selfNodeNumbInTopology;
-	myIP = getMyIP();
-	if(myIP=-1) DieWithError("Getting self IP Address Issue\r\n");
+	//myIP = getMyIP();
+	//if(myIP=-1) DieWithError("Getting self IP Address Issue\r\n");
 	//UDP socket create
 	SockID = createUDPsock(myServerPort);
 	for(i=0;i<noOfNeighbours;i++){
@@ -128,10 +134,10 @@ int main(int argc, char **argv){
 	for(i=0;i<noOfNeighbours;i++){
 		sendTo.sin_family = AF_INET;
 		sendTo.sin_port = htons(neighbourInfo->ServerPortNos[i]);
-		sendTo.sin_addr.s_addr = inet_addr(neighbourInfo->IPaddr[i]);
+		sendTo.sin_addr.s_addr = neighbourInfo->IPaddr[i];
 		sendto(SockID,myCostMatrix,sizeof(float) *  (noOfNodesInTopology),0,(struct sockaddr *)&sendTo,sizeof(sendTo));
 	}
-	if(0 != pthread_create( &thread_DV_ALGO, NULL, DV_ALGO, clientSenderThreadArgument)) DieWithError("Error - pthread_create()");	
+	if(0 != pthread_create( &thread_DV_ALGO, NULL, DV_ALGO, NULL)) DieWithError("Error - pthread_create()");	
 //    if(0 !=pthread_create( &thread_timer, NULL, timerFunc, clientSenderThreadArgument)) DieWithError("Error - pthread_create()");
 
 	pthread_join( thread_DV_ALGO, NULL);
