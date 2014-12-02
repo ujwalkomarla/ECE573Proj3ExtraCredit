@@ -15,7 +15,7 @@ unsigned int SockID;
 pthread_mutex_t sendMutex;
 float *myNextHopMatrix; 
 int DataSize;
-FILE *fp;
+FILE *fp, *fd;
 char *buf;
 //char *sendMyCostMatrix;//6-> 000.0 
 
@@ -39,13 +39,13 @@ void *timelyUpdates(void *msg)
 	fread(buf,sizeof(char),DataSize,fp);
 	for(i=0;i<noOfNeighbours;i++){
 		sendTo.sin_family = AF_INET;
-		sendTo.sin_port = htons(neighbourInfo->ServerPortNos[i]);
+		sendTo.sin_port = (neighbourInfo->ServerPortNos[i]);
 		sendTo.sin_addr.s_addr = neighbourInfo->IPaddr[i];
 		
 		sendto(SockID,buf,DataSize,0,(struct sockaddr *)&sendTo,sizeof(sendTo));
 	}
 	pthread_mutex_unlock(&sendMutex);
-	sleep(1);
+	sleep(5);
   }
 }
 void* DV_ALGO(void *msg){
@@ -66,19 +66,26 @@ void* DV_ALGO(void *msg){
 			
 			}
 			buf[DataSize]='\0';
+			
+			rewind(fd);
+			fwrite(buf, 1, DataSize, fd);
+			rewind(fd);
 			//printf("RCVD %s\r\n",buf);
+			//printf("%d Port\r\n", tRecvdFrom.sin_port);
+			fflush(stdout);
 		for(i=0;i<noOfNeighbours;i++){
 			if(tRecvdFrom.sin_port == neighbourInfo->ServerPortNos[i] && tRecvdFrom.sin_addr.s_addr == neighbourInfo->IPaddr[i]){
-				//printf("here");fflush(stdout);
+				//printf("here\r\n");fflush(stdout);
 				costToi = myCostMatrix[neighbourInfo->NodeNumbInTopology[i]-1];
+					//printf("CostToi %d\r\n",costToi);fflush(stdout);
 				pthread_mutex_lock(&sendMutex);
-				printf("Received from %d at %d:",neighbourInfo->IPaddr[i],neighbourInfo->ServerPortNos[i]);
+				//printf("Received from %d at %d:",neighbourInfo->IPaddr[i],neighbourInfo->ServerPortNos[i]);
 				for(j=0;j<noOfNodesInTopology;j++){
-					sscanf(buf,"%f",&tVal);
-					printf("%f ",tVal);
+					fscanf(fd,"%f",&tVal);
+					//printf("%f ",tVal);
 					tVal+=costToi;
 					if(tVal<myCostMatrix[j]){
-						myCostMatrix[j] = buf[j];
+						myCostMatrix[j] = tVal;
 						myNextHopMatrix[j] = i;
 						SEND=1;
 					}
@@ -99,7 +106,7 @@ void* DV_ALGO(void *msg){
 			fread(buf,sizeof(char),DataSize,fp);
 			for(i=0;i<noOfNeighbours;i++){
 				sendTo.sin_family = AF_INET;
-				sendTo.sin_port = htons(neighbourInfo->ServerPortNos[i]);
+				sendTo.sin_port = (neighbourInfo->ServerPortNos[i]);
 				sendTo.sin_addr.s_addr = neighbourInfo->IPaddr[i];
 				
 				sendto(SockID,buf,DataSize,0,(struct sockaddr *)&sendTo,sizeof(sendTo));
@@ -108,8 +115,9 @@ void* DV_ALGO(void *msg){
 			pthread_mutex_unlock(&sendMutex);
 			SEND=0;
 		}
-		//for(i=0;i<noOfNodesInTopology;i++) printf("%.1f ",myCostMatrix[i]);
-		//printf("\r\n");
+		printf("Updated\r\n");
+		for(i=0;i<noOfNodesInTopology;i++) printf("%.1f ",myCostMatrix[i]);
+		printf("\r\n");
 	}
 }
 
@@ -153,11 +161,14 @@ int main(int argc, char **argv){
 		myNextHopMatrix[neighbourInfo->NodeNumbInTopology[i]-1] = neighbourInfo->NodeNumbInTopology[i] ;
 		
 	}
+	printf("Initial\r\n");
 	for(i=0;i<noOfNodesInTopology;i++) printf("%.1f ",myCostMatrix[i]);
 		printf("\r\n");
 	//Send matrix to neighbours
 	struct sockaddr_in sendTo;
 	fp = fopen("temp","w+");
+	fd = fopen("temp1","w+");
+
 	//sendMyCostMatrix = malloc(6*  (noOfNodesInTopology));//6-> 0.0 
 	DataSize = 4*noOfNodesInTopology;
 	buf = malloc(DataSize);
@@ -169,10 +180,11 @@ int main(int argc, char **argv){
 	//printf("%d T",fread(buf,1,DataSize,fp));
 	fread(buf,sizeof(char),DataSize,fp);
 	//printf("Sending %s",buf);
-	//fflush(stdout);
+	fflush(stdout);
+	sendTo.sin_family = AF_INET;
 	for(i=0;i<noOfNeighbours;i++){
-		sendTo.sin_family = AF_INET;
-		sendTo.sin_port = htons(neighbourInfo->ServerPortNos[i]);
+		
+		sendTo.sin_port = (neighbourInfo->ServerPortNos[i]);
 		sendTo.sin_addr.s_addr = neighbourInfo->IPaddr[i];
 		
 		sendto(SockID,buf,DataSize,0,(struct sockaddr *)&sendTo,sizeof(sendTo));
@@ -192,5 +204,3 @@ int main(int argc, char **argv){
 	close(SockID);
 	return 0;
 }
-
-
