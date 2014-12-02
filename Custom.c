@@ -35,7 +35,7 @@ int createUDPsock(int tSocket){
 	memset((struct sockaddr_in *)&myAddr, 0 , sizeof(myAddr));
 	myAddr.sin_family = AF_INET;
 	myAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	myAddr.sin_port = htons(tSocket);
+	myAddr.sin_port = tSocket;//htons(tSocket);
 	if(bind(sockID,(struct sockaddr *)&myAddr, sizeof(myAddr))<0) DieWithError("Unable to do a bind on socket"); 
 	return sockID;
 }
