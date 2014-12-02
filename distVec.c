@@ -13,7 +13,7 @@ int noOfNeighbours;
 struct neighbourDB *neighbourInfo;
 unsigned int SockID;
 pthread_mutex_t sendMutex;
-float *myNextHopMatrix; 
+int *myNextHopMatrix; 
 int DataSize;
 FILE *fp, *fd;
 char *buf;
@@ -45,7 +45,7 @@ void *timelyUpdates(void *msg)
 		sendto(SockID,buf,DataSize,0,(struct sockaddr *)&sendTo,sizeof(sendTo));
 	}
 	pthread_mutex_unlock(&sendMutex);
-	sleep(5);
+	sleep(10);
   }
 }
 void* DV_ALGO(void *msg){
@@ -86,7 +86,7 @@ void* DV_ALGO(void *msg){
 					tVal+=costToi;
 					if(tVal<myCostMatrix[j]){
 						myCostMatrix[j] = tVal;
-						myNextHopMatrix[j] = i;
+						myNextHopMatrix[j] = i+1;
 						SEND=1;
 					}
 				}
@@ -116,7 +116,7 @@ void* DV_ALGO(void *msg){
 			SEND=0;
 		}
 		printf("Updated\r\n");
-		for(i=0;i<noOfNodesInTopology;i++) printf("%.1f ",myCostMatrix[i]);
+		for(i=0;i<noOfNodesInTopology;i++) printf("%.1f,%d ",myCostMatrix[i],myNextHopMatrix[i]);
 		printf("\r\n");
 	}
 }
@@ -159,10 +159,10 @@ int main(int argc, char **argv){
 		neighbourInfo->NodeNumbInTopology[i] = atoi(argv[NEIGHBOUR_SET_START + 4 + (i*NEIGHBOUR_SET_INFO)]);//NodeNumbInTopology is at 7,11,15
 		myCostMatrix[neighbourInfo->NodeNumbInTopology[i]-1] = atof(argv[NEIGHBOUR_SET_START + 3 + (i*NEIGHBOUR_SET_INFO)]);//Cost to neighbour links is at 6,10,14
 		myNextHopMatrix[neighbourInfo->NodeNumbInTopology[i]-1] = neighbourInfo->NodeNumbInTopology[i] ;
-		
+	
 	}
 	printf("Initial\r\n");
-	for(i=0;i<noOfNodesInTopology;i++) printf("%.1f ",myCostMatrix[i]);
+	for(i=0;i<noOfNodesInTopology;i++) printf("%.1f,%d ",myCostMatrix[i],myNextHopMatrix[i]);
 		printf("\r\n");
 	//Send matrix to neighbours
 	struct sockaddr_in sendTo;
@@ -186,7 +186,7 @@ int main(int argc, char **argv){
 		
 		sendTo.sin_port = (neighbourInfo->ServerPortNos[i]);
 		sendTo.sin_addr.s_addr = neighbourInfo->IPaddr[i];
-		
+	
 		sendto(SockID,buf,DataSize,0,(struct sockaddr *)&sendTo,sizeof(sendTo));
 	}
 	
